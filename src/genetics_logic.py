@@ -8,6 +8,14 @@ parent = {
 child_sex = "male" | "female"
 """
 
+"""
+child_outcome:
+- None          -> no observation (default)
+- "affected"    -> observed affected
+- "unaffected"  -> observed unaffected
+"""
+
+
 def validate_inputs(parent1, parent2, child_sex, inheritance_type):
     if inheritance_type not in [
         "autosomal_recessive",
@@ -48,44 +56,23 @@ def get_carrier_probability(person):
 
     return 0.0
 
-# def autosomal_recessive_risk(parent1, parent2):
-#     p1 = get_carrier_probability(parent1)
-#     p2 = get_carrier_probability(parent2)
-
-#     risk = p1 * p2 * 0.25
-
-#     return {
-#         "min": risk,
-#         "max": risk,
-#         "confidence": confidence_level(risk, risk),
-#         "model": "autosomal_recessive",
-#         "factors": [
-#             f"Parent 1 status: {parent1['status']}",
-#             f"Parent 2 status: {parent2['status']}",
-#             "Condition requires two recessive alleles"
-#         ]
-#     }
-
 def autosomal_recessive_risk(parent1, parent2):
     p1 = get_carrier_probability(parent1)
     p2 = get_carrier_probability(parent2)
 
-    affected_risk = p1 * p2 * 0.25
-    carrier_risk = (p1 * (1 - p2) + (1 - p1) * p2) * 0.5
+    risk = p1 * p2 * 0.25
 
     return {
-        "min": affected_risk,
-        "max": affected_risk,
-        "carrier_risk": carrier_risk,
-        "confidence": confidence_level(affected_risk, affected_risk),
+        "min": risk,
+        "max": risk,
+        "confidence": confidence_level(risk, risk),
         "model": "autosomal_recessive",
         "factors": [
             f"Parent 1 status: {parent1['status']}",
             f"Parent 2 status: {parent2['status']}",
-            "Two recessive alleles required for condition"
+            "Condition requires two recessive alleles"
         ]
     }
-
 
 
 def autosomal_dominant_risk(parent1, parent2):
@@ -156,5 +143,61 @@ def calculate_risk(inheritance_type, parent1, parent2, child_sex):
         "factors": []
     }
 
+def reverse_update_parents_from_child(
+    inheritance_type,
+    child_outcome,
+    parent1,
+    parent2
+):
+    """
+    Updates parent carrier probabilities based on an observed child outcome.
+    This runs ONLY in observed-outcome mode.
+    """
+
+    # Only act if outcome is observed
+    if child_outcome not in ["affected", "unaffected"]:
+        return
+
+    # --- AUTOSOMAL RECESSIVE ---
+    if inheritance_type == "autosomal_recessive":
+        if child_outcome == "affected":
+            # An affected child MUST have received one allele from each parent
+            parent1["carrier_probability"] = 1.0
+            parent2["carrier_probability"] = 1.0
+
+        elif child_outcome == "unaffected":
+            # Weak evidence → do nothing (keep uncertainty)
+            pass
 
 
+def calculate_risk_with_observation(
+    inheritance_type,
+    parent1,
+    parent2,
+    child_sex,
+    observed_child_outcome=None
+):
+    """
+    Wrapper function.
+    - Always does forward calculation
+    - Optionally performs reverse update if outcome is observed
+    """
+
+    # Step 1: forward calculation (pure)
+    forward_result = calculate_risk(
+        inheritance_type,
+        parent1,
+        parent2,
+        child_sex
+    )
+
+    # Step 2: reverse update ONLY if explicitly requested
+    if observed_child_outcome is not None:
+        reverse_update_parents_from_child(
+            inheritance_type,
+            observed_child_outcome,
+            parent1,
+            parent2
+        )
+
+    return forward_result
