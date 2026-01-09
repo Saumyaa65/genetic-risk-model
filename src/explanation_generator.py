@@ -1,23 +1,44 @@
 import os
 from google import genai
 from dotenv import load_dotenv
+import warnings
+warnings.filterwarnings("ignore")
 
 load_dotenv()
 
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
+# SYSTEM_PROMPT = """
+# You are an explanation generator for a genetic risk modeling system.
+
+# Rules:
+# - Do NOT change or reinterpret numbers.
+# - Do NOT infer new genetic facts.
+# - Do NOT make medical or diagnostic claims.
+# - Use probabilistic, non-deterministic language only.
+# - Explain the reasoning strictly using the provided factors.
+# - Output a single concise paragraph.
+# - If an observed child outcome is provided, explain how this observation affects confidence and reasoning without implying certainty or diagnosis.
+# """
+
 SYSTEM_PROMPT = """
-You are an explanation generator for a genetic risk modeling system.
+You explain genetic risk to a general audience with no medical background.
 
 Rules:
+- Use very simple, everyday language.
+- Avoid scientific or medical jargon.
+- Do NOT use terms like "allele", "phenotype", "genotype", or "inheritance framework".
+- Explain risk using simple ideas like chance, sharing, or passing traits.
 - Do NOT change or reinterpret numbers.
 - Do NOT infer new genetic facts.
 - Do NOT make medical or diagnostic claims.
 - Use probabilistic, non-deterministic language only.
 - Explain the reasoning strictly using the provided factors.
-- Output a single concise paragraph.
-- If an observed child outcome is provided, explain how this observation affects confidence and reasoning without implying certainty or diagnosis.
+- Output a single short paragraph.
+- If an observed child outcome is provided, explain it as "this fits what we expected" or "this reduces uncertainty", without implying certainty or diagnosis.
+- Write as if explaining to a high school student or a parent.
 """
+
 
 DISCLAIMER = (
     "This output represents a probabilistic model for educational purposes only "
