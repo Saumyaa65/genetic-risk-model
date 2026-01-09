@@ -1,3 +1,9 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* Medical Teal Palette - Clean, Trustworthy, Scientific */
+  --background: 210 40% 98%;
+  --foreground: 215 25% 27%;
+
+  --primary: 173 80% 40%; /* Teal 700 */
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 215 16% 47%; /* Slate 500 */
+  --secondary-foreground: 210 40% 98%;
+
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+
+  --accent: 173 58% 39%;
+  --accent-foreground: 210 40% 98%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 173 80% 40%;
+  
+  --radius: 0.75rem;
+
+  /* Status Colors */
+  --status-affected: 0 84% 60%;
+  --status-carrier: 45 93% 47%;
+  --status-unaffected: 142 71% 45%;
+  --status-unknown: 215 16% 80%;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    @apply font-bold tracking-tight text-slate-900;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
+  }
+  
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-teal-500;
+  }
+}
