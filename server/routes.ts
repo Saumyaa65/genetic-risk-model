@@ -21,7 +21,13 @@ export async function registerRoutes(
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(input),
+          body: JSON.stringify({
+            inheritance_type: input.inheritance_type,
+            parent1: input.parent1,
+            parent2: input.parent2,
+            child_sex: input.child_sex,
+            observed_child_outcome: input.observed_child_outcome || null,
+          }),
         }
       );
 

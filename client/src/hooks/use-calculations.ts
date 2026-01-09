@@ -23,7 +23,7 @@ export function useCalculateRisk() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: InsertCalculation) => {
+    mutationFn: async (data: InsertCalculation & { observed_child_outcome?: string }) => {
       try {
         const res = await fetch(api.calculations.calculate.path, {
           method: api.calculations.calculate.method,
@@ -33,6 +33,7 @@ export function useCalculateRisk() {
             parent1: { status: data.motherStatus },
             parent2: { status: data.fatherStatus },
             child_sex: data.childSex === "unknown" ? "male" : data.childSex,
+            observed_child_outcome: data.observed_child_outcome || undefined,
           }),
         });
 

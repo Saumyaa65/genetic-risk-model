@@ -33,6 +33,7 @@ export default function Calculator() {
   });
 
   const { mutate: calculate, isPending, data: result } = useCalculateRisk();
+  const { mutate: calculateWithObservation, isPending: isRecalculating, data: reversedResult } = useCalculateRisk();
 
   const onSubmit = (data: InsertCalculation) => {
     calculate(data, {
@@ -42,6 +43,26 @@ export default function Calculator() {
 
   // Bayesian / "What If" local state
   const [observedOutcome, setObservedOutcome] = useState<string>("unknown");
+
+  // Handler for Recalculate Parent Risk button
+  const handleRecalculateParentRisk = () => {
+    if (!result || observedOutcome === "unknown") return;
+
+    const currentFormData = form.getValues();
+    
+    // Prepare data for reverse Bayesian calculation
+    const dataWithObservation = {
+      ...currentFormData,
+      childSex: currentFormData.childSex as "male" | "female",
+      observed_child_outcome: observedOutcome,
+    };
+
+    calculateWithObservation(dataWithObservation as any, {
+      onSuccess: () => {
+        // Result will be displayed automatically via reversedResult state
+      },
+    });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
@@ -213,8 +234,14 @@ export default function Calculator() {
                        </select>
                      </div>
                      <div className="pt-6">
-                       <Button variant="outline" className="w-full md:w-auto">
-                         <RefreshCw className="w-4 h-4 mr-2" /> Recalculate Parent Risk
+                       <Button 
+                         variant="outline" 
+                         className="w-full md:w-auto"
+                         onClick={handleRecalculateParentRisk}
+                         disabled={observedOutcome === "unknown" || isRecalculating}
+                       >
+                         <RefreshCw className={`w-4 h-4 mr-2 ${isRecalculating ? 'animate-spin' : ''}`} /> 
+                         {isRecalculating ? 'Recalculating…' : 'Recalculate Parent Risk'}
                        </Button>
                      </div>
                    </div>
@@ -223,6 +250,36 @@ export default function Calculator() {
                    </p>
                  </CardContent>
                </Card>
+
+               {/* Bayesian Update Results */}
+               {reversedResult && observedOutcome !== "unknown" && (
+                 <motion.div
+                   initial={{ opacity: 0, y: 10 }}
+                   animate={{ opacity: 1, y: 0 }}
+                   className="space-y-4"
+                 >
+                   <Card className="border-amber-200 bg-amber-50/50 shadow-lg shadow-amber-900/5 overflow-hidden">
+                     <div className="bg-amber-600 p-6 text-white flex items-center justify-between">
+                       <div>
+                         <h3 className="text-xl font-display font-bold">Updated Risk Analysis</h3>
+                         <p className="text-amber-100 opacity-90">Based on observed child outcome: {observedOutcome}</p>
+                       </div>
+                       <RefreshCw className="w-6 h-6 opacity-75" />
+                     </div>
+                     
+                     <CardContent className="pt-8">
+                       {reversedResult && (
+                         <RiskDisplay 
+                           percentage={reversedResult.riskPercentage}
+                           range={reversedResult.riskRange}
+                           confidence={reversedResult.confidence}
+                           explanation={reversedResult.explanation}
+                         />
+                       )}
+                     </CardContent>
+                   </Card>
+                 </motion.div>
+               )}
 
                <div className="flex justify-center gap-4">
                  <Button variant="outline" size="lg" onClick={() => setStep('input')}>
