@@ -97,12 +97,28 @@ def fallback_explanation(prompt: dict) -> str:
 
     # Observed affected child → reverse inference explanation
     if prompt.get("observed_child_outcome") == "affected":
-        return (
-            "An observed affected outcome provides evidence that both parents likely carry "
-            "the relevant allele, which reduces uncertainty in the inheritance assumptions. "
-            f"The estimated risk remains {min_r}%, "
-            f"with {prompt['confidence']} confidence."
-        )
+        inheritance_model = prompt.get("inheritance_model", "")
+        if inheritance_model == "autosomal_dominant":
+            return (
+                "An observed affected child outcome indicates that at least one parent likely carries "
+                "the dominant allele. This observation helps refine the probability estimates for the parents' "
+                f"carrier status. The updated risk estimate is {min_r}%, "
+                f"with {prompt['confidence']} confidence."
+            )
+        elif inheritance_model == "autosomal_recessive":
+            return (
+                "An observed affected child outcome indicates that both parents likely carry "
+                "the recessive allele. This observation helps refine the probability estimates for the parents' "
+                f"carrier status. The updated risk estimate is {min_r}%, "
+                f"with {prompt['confidence']} confidence."
+            )
+        else:
+            return (
+                "An observed affected child outcome provides evidence about the parents' carrier status, "
+                "which helps refine the probability estimates. "
+                f"The updated risk estimate is {min_r}%, "
+                f"with {prompt['confidence']} confidence."
+            )
 
     # Exact probability
     if min_r == max_r:

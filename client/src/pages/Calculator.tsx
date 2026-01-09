@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, RefreshCw, Calculator as CalcIcon, Save } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { calculateLocalRisk } from '@/lib/genetics';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { insertCalculationSchema, type InsertCalculation } from '@shared/schema';
 
@@ -43,19 +44,31 @@ export default function Calculator() {
 
   // Bayesian / "What If" local state
   const [observedOutcome, setObservedOutcome] = useState<string>("unknown");
+  const [localBayesian, setLocalBayesian] = useState<any | null>(null);
 
   // Handler for Recalculate Parent Risk button
   const handleRecalculateParentRisk = () => {
-    if (!result || observedOutcome === "unknown") return;
+    if (observedOutcome === "unknown") return;
 
     const currentFormData = form.getValues();
     
     // Prepare data for reverse Bayesian calculation
     const dataWithObservation = {
       ...currentFormData,
-      childSex: currentFormData.childSex as "male" | "female",
+      childSex: (currentFormData.childSex as any) === 'unknown' ? 'male' : (currentFormData.childSex as any),
       observed_child_outcome: observedOutcome,
     };
+
+    // compute local Bayesian fallback immediately so UI can show parent probabilities
+    try {
+      const local = calculateLocalRisk(dataWithObservation as any);
+      setLocalBayesian(local.bayesianUpdate ?? null);
+    } catch (e) {
+      setLocalBayesian(null);
+    }
+
+    // ensure we're showing the result view
+    setStep('result');
 
     calculateWithObservation(dataWithObservation as any, {
       onSuccess: () => {
@@ -269,12 +282,98 @@ export default function Calculator() {
                      
                      <CardContent className="pt-8">
                        {reversedResult && (
-                         <RiskDisplay 
-                           percentage={reversedResult.riskPercentage}
-                           range={reversedResult.riskRange}
-                           confidence={reversedResult.confidence}
-                           explanation={reversedResult.explanation}
-                         />
+                         <div className="space-y-4">
+                           {/* Textual Bayesian summary similar to test output */}
+                           <div className="p-4 bg-white rounded border border-slate-100">
+                             <div className="border-b pb-2 mb-3 text-slate-700 font-semibold text-base">Bayesian Update Details</div>
+
+                            <div className="space-y-2 text-sm text-slate-700">
+                              <div className="flex justify-between">
+                                <span className="font-medium">Original Risk:</span>
+                                <span className="text-slate-900">{result?.riskRange ?? reversedResult?.riskRange ?? 'N/A'}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="font-medium">Confidence:</span>
+                                <span className="text-slate-900 capitalize">{result?.confidence ?? reversedResult?.confidence ?? 'N/A'}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="font-medium">Bayesian Update Applied:</span>
+                                <span className="text-slate-900">{reversedResult.bayesianUpdate ? 'Yes' : 'No'}</span>
+                              </div>
+                              {reversedResult.bayesianUpdate && (
+                                <div className="space-y-3 pt-2">
+                                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                    <div className="text-xs font-semibold text-slate-600 mb-2">Updated Parent Probabilities</div>
+                                    <div className="space-y-2">
+                                      <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                          <span className="text-sm font-medium text-slate-700">Mother:</span>
+                                          <span className="text-sm font-semibold text-slate-900">
+                                            {(() => {
+                                              const origStatus = reversedResult.bayesianUpdate.parent1_original_status || 'unknown';
+                                              const prob = (reversedResult.bayesianUpdate.parent1_carrier_probability ?? 0) * 100;
+                                              if (origStatus === 'affected') {
+                                                return `Affected (100%)`;
+                                              } else if (origStatus === 'unaffected') {
+                                                return `Unaffected (0%)`;
+                                              } else {
+                                                return `${prob.toFixed(1)}% probability of being affected`;
+                                              }
+                                            })()}
+                                          </span>
+                                        </div>
+                                        {reversedResult.bayesianUpdate.parent1_original_status === 'unknown' && (
+                                          <div className="text-xs text-slate-500 italic">
+                                            Original: Unknown (50%) → Updated: {((reversedResult.bayesianUpdate.parent1_carrier_probability ?? 0) * 100).toFixed(1)}%
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                          <span className="text-sm font-medium text-slate-700">Father:</span>
+                                          <span className="text-sm font-semibold text-slate-900">
+                                            {(() => {
+                                              const origStatus = reversedResult.bayesianUpdate.parent2_original_status || 'unknown';
+                                              const prob = (reversedResult.bayesianUpdate.parent2_carrier_probability ?? 0) * 100;
+                                              if (origStatus === 'affected') {
+                                                return `Affected (100%)`;
+                                              } else if (origStatus === 'unaffected') {
+                                                return `Unaffected (0%)`;
+                                              } else {
+                                                return `${prob.toFixed(1)}% probability of being affected`;
+                                              }
+                                            })()}
+                                          </span>
+                                        </div>
+                                        {reversedResult.bayesianUpdate.parent2_original_status === 'unknown' && (
+                                          <div className="text-xs text-slate-500 italic">
+                                            Original: Unknown (50%) → Updated: {((reversedResult.bayesianUpdate.parent2_carrier_probability ?? 0) * 100).toFixed(1)}%
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="flex justify-between pt-2 border-t border-slate-200">
+                                <span className="font-semibold">Updated Risk:</span>
+                                <span className="text-slate-900 font-semibold">{(() => {
+                                  const br = reversedResult.bayesianUpdate?.updated_risk;
+                                  if (br && typeof br.min === 'number' && typeof br.max === 'number') {
+                                    return `${(br.min*100).toFixed(1)}% - ${(br.max*100).toFixed(1)}%`;
+                                  }
+                                  return reversedResult.riskRange ?? 'N/A';
+                                })()}</span>
+                              </div>
+                            </div>
+                           </div>
+
+                           {/* Clinical explanation card */}
+                           <div className="p-4 rounded-xl border border-slate-100 bg-slate-50">
+                             <h4 className="text-sm font-medium text-slate-700 mb-2">Clinical Explanation</h4>
+                             <p className="text-sm text-slate-600">{reversedResult.explanation}</p>
+                           </div>
+                         </div>
                        )}
                      </CardContent>
                    </Card>

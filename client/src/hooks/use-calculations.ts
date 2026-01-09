@@ -46,11 +46,15 @@ export function useCalculateRisk() {
         const min = pythonResult.risk.min * 100;
         const max = pythonResult.risk.max * 100;
 
+        // Include optional Bayesian update metadata when present
+        const bayesian = pythonResult.risk.bayesian_update || null;
+
         return {
           riskPercentage: Math.round((min + max) / 2),
           riskRange: `${Math.round(min)}% - ${Math.round(max)}%`,
           confidence: pythonResult.risk.confidence,
           explanation: pythonResult.explanation,
+          bayesianUpdate: bayesian,
         };
       } catch (e) {
         // Fallback to local calculation if Python service is unavailable
