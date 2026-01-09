@@ -23,9 +23,40 @@ const INITIAL_DATA: InsertCalculation = {
   riskResult: {}, // Backend handles this, but we need it for type satisfaction if strict
 };
 
+// Example conditions mapping (educational only)
+type ExampleConditionKey = "cystic_fibrosis" | "sickle_cell_anemia" | "huntingtons_disease" | "hemophilia_a";
+
+const EXAMPLE_CONDITIONS: Record<ExampleConditionKey, {
+  inheritancePattern: InsertCalculation["inheritancePattern"];
+  motherStatus: InsertCalculation["motherStatus"];
+  fatherStatus: InsertCalculation["fatherStatus"];
+}> = {
+  "cystic_fibrosis": { 
+    inheritancePattern: "autosomal_recessive", 
+    motherStatus: "carrier", 
+    fatherStatus: "carrier" 
+  },
+  "sickle_cell_anemia": { 
+    inheritancePattern: "autosomal_recessive", 
+    motherStatus: "carrier", 
+    fatherStatus: "carrier" 
+  },
+  "huntingtons_disease": { 
+    inheritancePattern: "autosomal_dominant", 
+    motherStatus: "affected", 
+    fatherStatus: "unaffected" 
+  },
+  "hemophilia_a": { 
+    inheritancePattern: "x_linked", 
+    motherStatus: "carrier", 
+    fatherStatus: "unaffected" 
+  },
+};
+
 export default function Calculator() {
   const [step, setStep] = useState<"input" | "result">("input");
   const [, setLocation] = useLocation();
+  const [selectedExample, setSelectedExample] = useState<string>("");
   
   // React Hook Form for state management and validation
   const form = useForm<InsertCalculation>({
@@ -35,6 +66,17 @@ export default function Calculator() {
 
   const { mutate: calculate, isPending, data: result } = useCalculateRisk();
   const { mutate: calculateWithObservation, isPending: isRecalculating, data: reversedResult } = useCalculateRisk();
+
+  // Handle example condition selection
+  const handleExampleConditionChange = (value: string) => {
+    setSelectedExample(value);
+    if (value && value in EXAMPLE_CONDITIONS) {
+      const example = EXAMPLE_CONDITIONS[value as ExampleConditionKey];
+      form.setValue("inheritancePattern", example.inheritancePattern);
+      form.setValue("motherStatus", example.motherStatus);
+      form.setValue("fatherStatus", example.fatherStatus);
+    }
+  };
 
   const onSubmit = (data: InsertCalculation) => {
     calculate(data, {
@@ -114,28 +156,46 @@ export default function Calculator() {
                     <CardTitle>Inheritance Configuration</CardTitle>
                     <CardDescription>Select the known genetic pattern for this condition.</CardDescription>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <CardContent className="space-y-6">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Inheritance Pattern</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Example Condition <span className="text-xs text-slate-500 font-normal">(optional, educational only)</span>
+                      </label>
                       <select 
-                        {...form.register("inheritancePattern")}
+                        value={selectedExample}
+                        onChange={(e) => handleExampleConditionChange(e.target.value)}
                         className="w-full rounded-xl border-slate-200 shadow-sm focus:border-teal-500 focus:ring-teal-500 py-3 px-4 bg-slate-50"
                       >
-                        <option value="autosomal_recessive">Autosomal Recessive</option>
-                        <option value="autosomal_dominant">Autosomal Dominant</option>
-                        <option value="x_linked">X-Linked Recessive</option>
+                        <option value="">None - Manual Entry</option>
+                        <option value="cystic_fibrosis">Cystic Fibrosis</option>
+                        <option value="sickle_cell_anemia">Sickle Cell Anemia</option>
+                        <option value="huntingtons_disease">Huntington's Disease</option>
+                        <option value="hemophilia_a">Hemophilia A</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Child's Sex (Projected)</label>
-                      <select 
-                        {...form.register("childSex")}
-                        className="w-full rounded-xl border-slate-200 shadow-sm focus:border-teal-500 focus:ring-teal-500 py-3 px-4 bg-slate-50"
-                      >
-                        <option value="unknown">Any / Unknown</option>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                      </select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Inheritance Pattern</label>
+                        <select 
+                          {...form.register("inheritancePattern")}
+                          className="w-full rounded-xl border-slate-200 shadow-sm focus:border-teal-500 focus:ring-teal-500 py-3 px-4 bg-slate-50"
+                        >
+                          <option value="autosomal_recessive">Autosomal Recessive</option>
+                          <option value="autosomal_dominant">Autosomal Dominant</option>
+                          <option value="x_linked">X-Linked Recessive</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Child's Sex (Projected)</label>
+                        <select 
+                          {...form.register("childSex")}
+                          className="w-full rounded-xl border-slate-200 shadow-sm focus:border-teal-500 focus:ring-teal-500 py-3 px-4 bg-slate-50"
+                        >
+                          <option value="unknown">Any / Unknown</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                        </select>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
