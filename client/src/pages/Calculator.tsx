@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { insertCalculationSchema, type InsertCalculation } from '@shared/schema';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { FamilyMemberNode } from '@/components/genetics/FamilyTree';
 import { RiskDisplay } from '@/components/genetics/RiskDisplay';
 import { useCalculateRisk } from '@/hooks/use-calculations';

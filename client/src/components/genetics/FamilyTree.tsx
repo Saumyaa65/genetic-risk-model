@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { User, CheckCircle2, AlertTriangle, XCircle, HelpCircle } from 'lucide-react';
-import { cn } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 // Types for props
 type Status = "affected" | "carrier" | "unaffected" | "unknown";
