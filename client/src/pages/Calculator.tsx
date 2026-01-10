@@ -317,9 +317,7 @@ export default function Calculator() {
                             status="unknown" 
                             readOnly 
                           />
-                          <div className="absolute -right-32 top-8 hidden md:block w-48 text-xs text-slate-400 italic">
-                            * Projecting risk for this generation
-                          </div>
+                    
                         </div>
                       </div>
                     ) : (

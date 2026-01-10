@@ -24,7 +24,7 @@ export default function Home() {
           <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-teal-500/20">
             <Dna className="w-6 h-6" />
           </div>
-          <span className="font-display font-bold text-xl tracking-tight text-white">GeneRisks</span>
+          <span className="font-display font-bold text-xl tracking-tight text-white">XGene</span>
         </div>
         <div className="hidden md:flex gap-6">
           <a href="#" className="text-sm font-medium text-slate-300 hover:text-teal-400 transition-colors">Methodology</a>
@@ -71,10 +71,6 @@ export default function Home() {
             <div className="mt-12 flex items-center gap-8 text-sm text-slate-400 font-medium">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-teal-400" />
-                HIPAA Compliant
-              </div>
-              <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-teal-400" />
                 99.9% Accuracy
               </div>
             </div>
