@@ -27,94 +27,153 @@ export interface CalculationResult {
 export function calculateLocalRisk(data: InsertCalculation & { observed_child_outcome?: string }): CalculationResult {
   const { inheritancePattern, motherStatus, fatherStatus } = data;
   const observed = (data as any).observed_child_outcome;
-  
   let riskPercentage = 0;
-  let riskRange = "0% - 10%";
+  let riskRange = "0% - 0%";
   let reasoning: string[] = [];
   let explanation = "";
   let bayesian: CalculationResult['bayesianUpdate'] = null;
 
-  // Simplified Mock Logic
-  if (inheritancePattern === "autosomal_recessive") {
-    if (motherStatus === "carrier" && fatherStatus === "carrier") {
-      riskPercentage = 25;
-      riskRange = "20% - 30%";
-      reasoning = [
-        "Mother is a Carrier",
-        "Father is a Carrier",
-        "Autosomal Recessive Pattern"
-      ];
-      explanation = "When both parents are carriers of an autosomal recessive condition, there is a 25% chance with each pregnancy that the child will inherit the mutated gene from both parents and be affected.";
-    } else if ((motherStatus === "carrier" && fatherStatus === "affected") || (motherStatus === "affected" && fatherStatus === "carrier")) {
-      riskPercentage = 50;
-      riskRange = "45% - 55%";
-      reasoning = ["One parent Affected, one Carrier"];
-      explanation = "There is a 50% chance the child will be affected.";
-    } else if (motherStatus === "affected" && fatherStatus === "affected") {
-      riskPercentage = 100;
-      riskRange = "> 99%";
-      reasoning = ["Both parents Affected"];
-      explanation = "All children will inherit the recessive genes.";
-    } else {
-       riskPercentage = 0; // Simplified for demo
-       reasoning = ["At least one parent is unaffected/non-carrier"];
-       explanation = "Risk is low as both parents do not carry the gene.";
+  // Priors matching server implementation
+  const DEFAULT_PRIORS = {
+    autosomal_recessive: { carrier_prior: 0.01, affected_prior: 0.0001 },
+    autosomal_dominant: { affected_prior: 0.001 },
+    x_linked: { mother_carrier_prior: 0.01, mother_affected_prior: 0.0001, father_affected_prior: 0.0005 }
+  };
+
+  function transmitProbAR(status: string, role: 'father' | 'mother') {
+    if (status === 'affected') return 1.0;
+    if (status === 'carrier') return 0.5;
+    if (status === 'unaffected') return 0.0;
+    // unknown: use priors
+    if (role === 'mother') {
+      const carrier = DEFAULT_PRIORS.x_linked.mother_carrier_prior;
+      const affected = DEFAULT_PRIORS.autosomal_recessive.affected_prior;
+      return carrier * 0.5 + affected * 1.0;
     }
-  } else if (inheritancePattern === "autosomal_dominant") {
-     if (motherStatus === "affected" || fatherStatus === "affected") {
-       riskPercentage = 50;
-       riskRange = "45% - 55%";
-       reasoning = ["One parent Affected (Heterozygous presumed)"];
-       explanation = "In autosomal dominant conditions, if one parent is affected (heterozygous), there is a 50% chance of passing the condition.";
-     }
+    const carrier = DEFAULT_PRIORS.autosomal_recessive.carrier_prior;
+    const affected = DEFAULT_PRIORS.autosomal_recessive.affected_prior;
+    return carrier * 0.5 + affected * 1.0;
   }
 
-  // Fallback for demo
-  if (riskPercentage === 0 && (motherStatus !== 'unaffected' || fatherStatus !== 'unaffected')) {
-      riskPercentage = 5; 
-      riskRange = "< 5%";
-      explanation = "Based on the provided statuses, the specific risk calculation is complex or low. A detailed genetic counseling session is recommended.";
+  function transmitProbAD(status: string) {
+    if (status === 'affected' || status === 'carrier') return 0.5;
+    if (status === 'unaffected') return 0.0;
+    // unknown
+    return DEFAULT_PRIORS.autosomal_dominant.affected_prior * 0.5;
   }
 
-  // If an observed child outcome is provided, compute a simple Bayesian update for parents
+  function motherTransmitXLR(status: string) {
+    if (status === 'affected') return 1.0;
+    if (status === 'carrier') return 0.5;
+    if (status === 'unaffected') return 0.0;
+    return DEFAULT_PRIORS.x_linked.mother_carrier_prior * 0.5 + DEFAULT_PRIORS.x_linked.mother_affected_prior * 1.0;
+  }
+
+  function fatherTransmitToDaughterXLR(status: string) {
+    if (status === 'affected') return 1.0;
+    if (status === 'unaffected') return 0.0;
+    return DEFAULT_PRIORS.x_linked.father_affected_prior;
+  }
+
+  // Compute forward risk according to corrected Mendelian rules
+  if (inheritancePattern === 'autosomal_recessive') {
+    const p_f = transmitProbAR(fatherStatus, 'father');
+    const p_m = transmitProbAR(motherStatus, 'mother');
+    const risk = p_f * p_m;
+    riskPercentage = Math.round(risk * 100);
+    riskRange = `${(risk * 100).toFixed(2)}% - ${(risk * 100).toFixed(2)}%`;
+    explanation = 'Autosomal recessive: child affected if both parents transmit mutant allele.';
+    reasoning = [`Father: ${fatherStatus}`, `Mother: ${motherStatus}`];
+  } else if (inheritancePattern === 'autosomal_dominant') {
+    const p_f = transmitProbAD(fatherStatus);
+    const p_m = transmitProbAD(motherStatus);
+    const risk = 1.0 - (1.0 - p_f) * (1.0 - p_m);
+    riskPercentage = Math.round(risk * 100);
+    riskRange = `${(risk * 100).toFixed(2)}% - ${(risk * 100).toFixed(2)}%`;
+    explanation = 'Autosomal dominant: child affected if at least one parent transmits dominant allele.';
+    reasoning = [`Father: ${fatherStatus}`, `Mother: ${motherStatus}`];
+  } else if (inheritancePattern === 'x_linked') {
+    const p_m = motherTransmitXLR(motherStatus);
+    if (data.childSex === 'male') {
+      const risk = p_m;
+      riskPercentage = Math.round(risk * 100);
+      riskRange = `${(risk * 100).toFixed(2)}% - ${(risk * 100).toFixed(2)}%`;
+      explanation = 'X-linked recessive: male child affected if mother transmits mutant X.';
+      reasoning = [`Mother: ${motherStatus}`, `Father: ${fatherStatus}`];
+    } else if (data.childSex === 'female') {
+      const p_f_d = fatherTransmitToDaughterXLR(fatherStatus);
+      const risk = p_m * p_f_d;
+      riskPercentage = Math.round(risk * 100);
+      riskRange = `${(risk * 100).toFixed(2)}% - ${(risk * 100).toFixed(2)}%`;
+      explanation = 'X-linked recessive: female child affected only if both parents provide mutant X.';
+      reasoning = [`Mother: ${motherStatus}`, `Father: ${fatherStatus}`];
+    } else {
+      const p_f_d = fatherTransmitToDaughterXLR(fatherStatus);
+      const maleRisk = p_m;
+      const femaleRisk = p_m * p_f_d;
+      const minRisk = Math.min(maleRisk, femaleRisk);
+      const maxRisk = Math.max(maleRisk, femaleRisk);
+      riskPercentage = Math.round((maleRisk + femaleRisk) / 2 * 100);
+      riskRange = `${(minRisk * 100).toFixed(2)}% - ${(maxRisk * 100).toFixed(2)}%`;
+      explanation = 'X-linked recessive: risk differs by sex; males receive maternal X only, females require both parents.';
+      reasoning = [`Mother: ${motherStatus}`, `Father: ${fatherStatus}`];
+    }
+  }
+
+  // Bayesian reverse-update mirroring server behavior for AR and XLR (AD partial)
   if (observed && observed !== 'unknown') {
-    // simple priors from statuses
-    const prior1 = motherStatus === 'carrier' || motherStatus === 'affected' ? 1 : motherStatus === 'unknown' ? 0.5 : 0;
-    const prior2 = fatherStatus === 'carrier' || fatherStatus === 'affected' ? 1 : fatherStatus === 'unknown' ? 0.5 : 0;
-
     if (inheritancePattern === 'autosomal_recessive') {
       if (observed === 'affected') {
         bayesian = {
-          parent1_carrier_probability: 1.0,
-          parent2_carrier_probability: 1.0,
-          updated_risk: { min: 0.25, max: 0.25 }
+          parent1_carrier_probability: motherStatus === 'unaffected' ? 0.0 : 1.0,
+          parent2_carrier_probability: fatherStatus === 'unaffected' ? 0.0 : 1.0,
+          updated_risk: { min: (motherStatus === 'unaffected' ? 0.0 : 1.0) * (fatherStatus === 'unaffected' ? 0.0 : 1.0) , max: (motherStatus === 'unaffected' ? 0.0 : 1.0) * (fatherStatus === 'unaffected' ? 0.0 : 1.0) }
         };
-        // reflect updated risk in display values
-        riskPercentage = 25;
-        riskRange = '25% - 25%';
+        riskPercentage = Math.round(bayesian.updated_risk!.min * 100);
+        riskRange = `${(bayesian.updated_risk!.min * 100).toFixed(2)}% - ${(bayesian.updated_risk!.max * 100).toFixed(2)}%`;
         explanation = 'Observed affected child implies both parents are likely carriers.';
       } else if (observed === 'unaffected') {
-        // posterior = (likelihood_carrier * prior) / (likelihood_carrier*prior + likelihood_noncarrier*(1-prior))
+        const priorMother = motherStatus === 'carrier' || motherStatus === 'affected' ? 1.0 : motherStatus === 'unknown' ? DEFAULT_PRIORS.autosomal_recessive.carrier_prior : 0.0;
+        const priorFather = fatherStatus === 'carrier' || fatherStatus === 'affected' ? 1.0 : fatherStatus === 'unknown' ? DEFAULT_PRIORS.autosomal_recessive.carrier_prior : 0.0;
         const likelihood_carrier = 0.75;
         const likelihood_noncarrier = 1.0;
-        const post1 = prior1 > 0 && prior1 < 1 ? (likelihood_carrier * prior1) / (likelihood_carrier * prior1 + likelihood_noncarrier * (1 - prior1)) : prior1;
-        const post2 = prior2 > 0 && prior2 < 1 ? (likelihood_carrier * prior2) / (likelihood_carrier * prior2 + likelihood_noncarrier * (1 - prior2)) : prior2;
-
+        const post1 = (0.0 < priorMother && priorMother < 1.0) ? (likelihood_carrier * priorMother) / (likelihood_carrier * priorMother + likelihood_noncarrier * (1 - priorMother)) : priorMother;
+        const post2 = (0.0 < priorFather && priorFather < 1.0) ? (likelihood_carrier * priorFather) / (likelihood_carrier * priorFather + likelihood_noncarrier * (1 - priorFather)) : priorFather;
         bayesian = {
           parent1_carrier_probability: post1,
           parent2_carrier_probability: post2,
-          // compute updated child risk
-          updated_risk: { min: post1 * post2 * 0.25, max: post1 * post2 * 0.25 }
+          updated_risk: { min: post1 * post2, max: post1 * post2 }
         };
-
-        // reflect updated risk in display values
-        const updatedRiskPct = bayesian.updated_risk.min * 100;
+        const updatedRiskPct = bayesian.updated_risk!.min * 100;
         riskPercentage = Math.round(updatedRiskPct);
         riskRange = `${updatedRiskPct.toFixed(2)}% - ${updatedRiskPct.toFixed(2)}%`;
         explanation = 'Observed unaffected child reduces the posterior probability that both parents are carriers.';
       }
     }
-    // other inheritance patterns could be added similarly
+
+    if (inheritancePattern === 'x_linked') {
+      if (observed === 'affected') {
+        if (data.childSex === 'male') {
+          bayesian = {
+            parent1_carrier_probability: fatherStatus === 'unaffected' ? 0.0 : 1.0,
+            parent2_carrier_probability: motherStatus === 'unaffected' ? 0.0 : 1.0,
+            updated_risk: { min: motherTransmitXLR(motherStatus), max: motherTransmitXLR(motherStatus) }
+          };
+        } else if (data.childSex === 'female') {
+          bayesian = {
+            parent1_carrier_probability: fatherStatus === 'unaffected' ? 0.0 : 1.0,
+            parent2_carrier_probability: motherStatus === 'unaffected' ? 0.0 : 1.0,
+            updated_risk: { min: motherTransmitXLR(motherStatus) * fatherTransmitToDaughterXLR(fatherStatus), max: motherTransmitXLR(motherStatus) * fatherTransmitToDaughterXLR(fatherStatus) }
+          };
+        }
+      } else if (observed === 'unaffected') {
+        if (data.childSex === 'male') {
+          const prior = motherStatus === 'unknown' ? DEFAULT_PRIORS.x_linked.mother_carrier_prior : (motherStatus === 'carrier' || motherStatus === 'affected' ? 1.0 : 0.0);
+          const posterior = (0.5 * prior) / (0.5 * prior + 1.0 * (1 - prior));
+          bayesian = { parent1_carrier_probability: fatherStatus === 'carrier' ? 1.0 : 0.0, parent2_carrier_probability: posterior, updated_risk: { min: posterior, max: posterior } };
+        }
+      }
+    }
   }
 
   return {

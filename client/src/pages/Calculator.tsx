@@ -370,21 +370,22 @@ export default function Calculator() {
                                           <span className="text-sm font-medium text-slate-700">Mother:</span>
                                           <span className="text-sm font-semibold text-slate-900">
                                             {(() => {
-                                              const origStatus = reversedResult.bayesianUpdate.parent1_original_status || 'unknown';
-                                              const prob = (reversedResult.bayesianUpdate.parent1_carrier_probability ?? 0) * 100;
+                                              // backend uses parent2 to represent mother in bayesian_update
+                                              const origStatus = reversedResult.bayesianUpdate.parent2_original_status || 'unknown';
+                                              const prob = (reversedResult.bayesianUpdate.parent2_carrier_probability ?? 0) * 100;
                                               if (origStatus === 'affected') {
                                                 return `Affected (100%)`;
                                               } else if (origStatus === 'unaffected') {
                                                 return `Unaffected (0%)`;
                                               } else {
-                                                return `${prob.toFixed(1)}% probability of being affected`;
+                                                return `${prob.toFixed(1)}% probability of being a carrier`;
                                               }
                                             })()}
                                           </span>
                                         </div>
-                                        {reversedResult.bayesianUpdate.parent1_original_status === 'unknown' && (
+                                        {reversedResult.bayesianUpdate.parent2_original_status === 'unknown' && (
                                           <div className="text-xs text-slate-500 italic">
-                                            Original: Unknown (50%) → Updated: {((reversedResult.bayesianUpdate.parent1_carrier_probability ?? 0) * 100).toFixed(1)}%
+                                            Original: Unknown (50%) → Updated: {((reversedResult.bayesianUpdate.parent2_carrier_probability ?? 0) * 100).toFixed(1)}%
                                           </div>
                                         )}
                                       </div>
@@ -393,21 +394,22 @@ export default function Calculator() {
                                           <span className="text-sm font-medium text-slate-700">Father:</span>
                                           <span className="text-sm font-semibold text-slate-900">
                                             {(() => {
-                                              const origStatus = reversedResult.bayesianUpdate.parent2_original_status || 'unknown';
-                                              const prob = (reversedResult.bayesianUpdate.parent2_carrier_probability ?? 0) * 100;
+                                              // backend uses parent1 to represent father in bayesian_update
+                                              const origStatus = reversedResult.bayesianUpdate.parent1_original_status || 'unknown';
+                                              const prob = (reversedResult.bayesianUpdate.parent1_carrier_probability ?? 0) * 100;
                                               if (origStatus === 'affected') {
                                                 return `Affected (100%)`;
                                               } else if (origStatus === 'unaffected') {
                                                 return `Unaffected (0%)`;
                                               } else {
-                                                return `${prob.toFixed(1)}% probability of being affected`;
+                                                return `${prob.toFixed(1)}% probability of being a carrier`;
                                               }
                                             })()}
                                           </span>
                                         </div>
-                                        {reversedResult.bayesianUpdate.parent2_original_status === 'unknown' && (
+                                        {reversedResult.bayesianUpdate.parent1_original_status === 'unknown' && (
                                           <div className="text-xs text-slate-500 italic">
-                                            Original: Unknown (50%) → Updated: {((reversedResult.bayesianUpdate.parent2_carrier_probability ?? 0) * 100).toFixed(1)}%
+                                            Original: Unknown (50%) → Updated: {((reversedResult.bayesianUpdate.parent1_carrier_probability ?? 0) * 100).toFixed(1)}%
                                           </div>
                                         )}
                                       </div>
