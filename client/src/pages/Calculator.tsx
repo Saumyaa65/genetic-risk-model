@@ -23,6 +23,11 @@ const INITIAL_DATA: InsertCalculation = {
   riskResult: {}, // Backend handles this, but we need it for type satisfaction if strict
 };
 
+// Extended state for 3-gen mode (grandparent info stored separately)
+type ExtendedCalculation = InsertCalculation & {
+  grandparentStatus?: "affected" | "carrier" | "unaffected" | "unknown";
+};
+
 // Example conditions mapping (educational only)
 type ExampleConditionKey = "cystic_fibrosis" | "sickle_cell_anemia" | "huntingtons_disease" | "hemophilia_a";
 
@@ -57,6 +62,13 @@ export default function Calculator() {
   const [step, setStep] = useState<"input" | "result">("input");
   const [, setLocation] = useLocation();
   const [selectedExample, setSelectedExample] = useState<string>("");
+  const [generations, setGenerations] = useState<2 | 3>(2); // Default to 2-gen
+  
+  // Grandparent states for 3-gen mode
+  const [maternalGrandmotherStatus, setMaternalGrandmotherStatus] = useState<"affected" | "carrier" | "unaffected" | "unknown">("unknown");
+  const [maternalGrandfatherStatus, setMaternalGrandfatherStatus] = useState<"affected" | "carrier" | "unaffected" | "unknown">("unknown");
+  const [paternalGrandmotherStatus, setPaternalGrandmotherStatus] = useState<"affected" | "carrier" | "unaffected" | "unknown">("unknown");
+  const [paternalGrandfatherStatus, setPaternalGrandfatherStatus] = useState<"affected" | "carrier" | "unaffected" | "unknown">("unknown");
   
   // React Hook Form for state management and validation
   const form = useForm<InsertCalculation>({
@@ -79,7 +91,19 @@ export default function Calculator() {
   };
 
   const onSubmit = (data: InsertCalculation) => {
-    calculate(data, {
+    // Add generations parameter to the calculation
+    const dataWithGenerations = { 
+      ...data, 
+      generations,
+      // For 3-gen: include all grandparent statuses
+      ...(generations === 3 ? {
+        maternalGrandmotherStatus,
+        maternalGrandfatherStatus,
+        paternalGrandmotherStatus,
+        paternalGrandfatherStatus,
+      } : {})
+    };
+    calculate(dataWithGenerations as any, {
       onSuccess: () => setStep("result"),
     });
   };
@@ -99,6 +123,13 @@ export default function Calculator() {
       ...currentFormData,
       childSex: (currentFormData.childSex as any) === 'unknown' ? 'male' : (currentFormData.childSex as any),
       observed_child_outcome: observedOutcome,
+      generations: generations,
+      ...(generations === 3 ? {
+        maternalGrandmotherStatus,
+        maternalGrandfatherStatus,
+        paternalGrandmotherStatus,
+        paternalGrandfatherStatus,
+      } : {})
     };
 
     // compute local Bayesian fallback immediately so UI can show parent probabilities
@@ -157,6 +188,52 @@ export default function Calculator() {
                     <CardDescription>Select the known genetic pattern for this condition.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <label className="block text-sm font-medium text-slate-700">
+                        Model Mode:
+                      </label>
+                      <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGenerations(2);
+                            // Reset grandparent states when switching to 2-gen
+                            setMaternalGrandmotherStatus("unknown");
+                            setMaternalGrandfatherStatus("unknown");
+                            setPaternalGrandmotherStatus("unknown");
+                            setPaternalGrandfatherStatus("unknown");
+                          }}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            generations === 2
+                              ? "bg-white text-slate-900 shadow-sm"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          2-Gen
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGenerations(3);
+                            // Reset grandparent states when switching to 3-gen
+                            setMaternalGrandmotherStatus("unknown");
+                            setMaternalGrandfatherStatus("unknown");
+                            setPaternalGrandmotherStatus("unknown");
+                            setPaternalGrandfatherStatus("unknown");
+                          }}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            generations === 3
+                              ? "bg-white text-slate-900 shadow-sm"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          3-Gen
+                        </button>
+                      </div>
+                      <span className="text-xs text-slate-500">
+                        {generations === 2 ? "Parent-child only" : "Full pedigree with maternal and paternal grandparents"}
+                      </span>
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Example Condition <span className="text-xs text-slate-500 font-normal">(optional, educational only)</span>
@@ -202,43 +279,137 @@ export default function Calculator() {
 
                 {/* Family Tree Visualizer */}
                 <Card className="overflow-hidden border-teal-100 shadow-teal-900/5">
-                  <div className="bg-gradient-to-b from-teal-50/50 to-white p-8">
-                    <div className="flex flex-col items-center relative min-h-[400px]">
-                      
-                      {/* Parents Layer */}
-                      <div className="flex justify-center gap-24 md:gap-48 relative z-10 w-full mb-24">
-                        <FamilyMemberNode 
-                          role="Mother" 
-                          status={form.watch("motherStatus") as any}
-                          onChange={(val) => form.setValue("motherStatus", val)}
-                        />
-                        <FamilyMemberNode 
-                          role="Father" 
-                          status={form.watch("fatherStatus") as any}
-                          onChange={(val) => form.setValue("fatherStatus", val)}
-                        />
-                      </div>
-
-                      {/* Connecting Lines Graphic */}
-                      <div className="absolute inset-0 top-12 pointer-events-none">
-                         {/* We position this absolutely to overlay nicely */}
-                         <div className="w-[calc(100%-100px)] md:w-[400px] border-t-2 border-slate-300 mx-auto absolute left-0 right-0 top-12"></div>
-                         <div className="h-32 border-l-2 border-slate-300 absolute left-1/2 -translate-x-1/2 top-12"></div>
-                      </div>
-
-                      {/* Child Layer */}
-                      <div className="relative z-10">
-                         <FamilyMemberNode 
-                           role="Child" 
-                           status="unknown" 
-                           readOnly 
-                         />
-                         <div className="absolute -right-32 top-8 hidden md:block w-48 text-xs text-slate-400 italic">
-                           * Projecting risk for this generation
-                         </div>
-                      </div>
-
+                  {generations === 3 && (
+                    <div className="bg-amber-50 border-b border-amber-200 px-6 py-3">
+                      <p className="text-xs text-amber-800">
+                        <strong>Note:</strong> The 3-generation calculation currently uses the maternal grandmother as the primary grandparent for the maternal lineage. All grandparents are displayed and editable for future enhanced calculations.
+                      </p>
                     </div>
+                  )}
+                  <div className="bg-gradient-to-b from-teal-50/50 to-white p-8">
+                    {generations === 2 ? (
+                      // 2-Generation Tree: Parents → Child
+                      <div className="flex flex-col items-center relative min-h-[400px]">
+                        {/* Parents Layer */}
+                        <div className="flex justify-center gap-24 md:gap-48 relative z-10 w-full mb-24">
+                          <FamilyMemberNode 
+                            role="Mother" 
+                            status={form.watch("motherStatus") as any}
+                            onChange={(val) => form.setValue("motherStatus", val)}
+                          />
+                          <FamilyMemberNode 
+                            role="Father" 
+                            status={form.watch("fatherStatus") as any}
+                            onChange={(val) => form.setValue("fatherStatus", val)}
+                          />
+                        </div>
+
+                        {/* Connecting Lines Graphic */}
+                        <div className="absolute inset-0 top-12 pointer-events-none">
+                          <div className="w-[calc(100%-100px)] md:w-[400px] border-t-2 border-slate-300 mx-auto absolute left-0 right-0 top-12"></div>
+                          <div className="h-32 border-l-2 border-slate-300 absolute left-1/2 -translate-x-1/2 top-12"></div>
+                        </div>
+
+                        {/* Child Layer */}
+                        <div className="relative z-10">
+                          <FamilyMemberNode 
+                            role="Child" 
+                            status="unknown" 
+                            readOnly 
+                          />
+                          <div className="absolute -right-32 top-8 hidden md:block w-48 text-xs text-slate-400 italic">
+                            * Projecting risk for this generation
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      // 3-Generation Tree: All 4 Grandparents → Parents → Child
+                      <div className="flex flex-col items-center relative min-h-[800px] py-4">
+                        {/* Grandparents Layer - Top */}
+                        <div className="relative z-10 w-full mb-8">
+                          <div className="flex justify-center gap-12 md:gap-24 mb-4">
+                            {/* Maternal Grandparents */}
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="text-xs text-slate-500 font-medium mb-2">Maternal</div>
+                              <div className="flex gap-3">
+                                <FamilyMemberNode 
+                                  role="Maternal Grandmother" 
+                                  status={maternalGrandmotherStatus}
+                                  onChange={(val) => setMaternalGrandmotherStatus(val as any)}
+                                />
+                                <FamilyMemberNode 
+                                  role="Maternal Grandfather" 
+                                  status={maternalGrandfatherStatus}
+                                  onChange={(val) => setMaternalGrandfatherStatus(val as any)}
+                                />
+                              </div>
+                            </div>
+                            
+                            {/* Paternal Grandparents */}
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="text-xs text-slate-500 font-medium mb-2">Paternal</div>
+                              <div className="flex gap-3">
+                                <FamilyMemberNode 
+                                  role="Paternal Grandmother" 
+                                  status={paternalGrandmotherStatus}
+                                  onChange={(val) => setPaternalGrandmotherStatus(val as any)}
+                                />
+                                <FamilyMemberNode 
+                                  role="Paternal Grandfather" 
+                                  status={paternalGrandfatherStatus}
+                                  onChange={(val) => setPaternalGrandfatherStatus(val as any)}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Connecting Lines: Grandparents to Parents */}
+                        <div className="absolute top-[140px] left-0 right-0 h-24 pointer-events-none z-0">
+                          {/* Maternal grandparents to mother */}
+                          <div className="absolute left-[calc(25%-60px)] w-[120px] top-0 h-12 border-t-2 border-slate-300"></div>
+                          <div className="absolute left-[calc(25%-2px)] top-12 h-12 border-l-2 border-slate-300"></div>
+                          
+                          {/* Paternal grandparents to father */}
+                          <div className="absolute right-[calc(25%-60px)] w-[120px] top-0 h-12 border-t-2 border-slate-300"></div>
+                          <div className="absolute right-[calc(25%-2px)] top-12 h-12 border-l-2 border-slate-300"></div>
+                        </div>
+
+                        {/* Parents Layer - Middle */}
+                        <div className="relative z-10 w-full mb-8 mt-24">
+                          <div className="flex justify-center gap-24 md:gap-48">
+                            <FamilyMemberNode 
+                              role="Mother" 
+                              status={form.watch("motherStatus") as any}
+                              onChange={(val) => form.setValue("motherStatus", val)}
+                            />
+                            <FamilyMemberNode 
+                              role="Father" 
+                              status={form.watch("fatherStatus") as any}
+                              onChange={(val) => form.setValue("fatherStatus", val)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Connecting Lines: Parents to Child */}
+                        <div className="absolute top-[420px] left-0 right-0 h-24 pointer-events-none z-0">
+                          <div className="w-[calc(100%-100px)] md:w-[400px] border-t-2 border-slate-300 mx-auto"></div>
+                          <div className="h-24 border-l-2 border-slate-300 absolute left-1/2 -translate-x-1/2 top-0"></div>
+                        </div>
+
+                        {/* Child Layer - Bottom */}
+                        <div className="relative z-10 mt-24">
+                          <FamilyMemberNode 
+                            role="Child" 
+                            status="unknown" 
+                            readOnly 
+                          />
+                          <div className="absolute -right-32 top-8 hidden md:block w-48 text-xs text-slate-400 italic">
+                            * Projecting risk for this generation
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
                     <Button
@@ -269,7 +440,10 @@ export default function Calculator() {
                  <div className="bg-teal-600 p-6 text-white flex justify-between items-center">
                    <div>
                      <h2 className="text-2xl font-display font-bold">Analysis Results</h2>
-                     <p className="text-teal-100 opacity-90">Based on {form.getValues("inheritancePattern").replace("_", " ")} inheritance</p>
+                     <p className="text-teal-100 opacity-90">
+                       Based on {form.getValues("inheritancePattern").replace("_", " ")} inheritance
+                       {generations === 3 ? " (3-generation model)" : " (2-generation model)"}
+                     </p>
                    </div>
                    <Button variant="secondary" size="sm" onClick={() => setStep("input")}>Edit Parameters</Button>
                  </div>

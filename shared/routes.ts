@@ -18,7 +18,13 @@ export const api = {
         parent1: z.object({ status: z.enum(['affected','carrier','unaffected','unknown'] as const) }),
         parent2: z.object({ status: z.enum(['affected','carrier','unaffected','unknown'] as const) }),
         child_sex: z.enum(['male','female']),
-        observed_child_outcome: z.enum(['affected','unaffected','unknown']).optional()
+        observed_child_outcome: z.enum(['affected','unaffected','unknown']).optional(),
+        generations: z.number().int().min(2).max(3).optional().default(2), // 2-gen or 3-gen, default 2
+        // Optional grandparent fields for 3-gen mode (for future extended calculations)
+        maternal_grandmother: z.object({ status: z.enum(['affected','carrier','unaffected','unknown'] as const) }).optional(),
+        maternal_grandfather: z.object({ status: z.enum(['affected','carrier','unaffected','unknown'] as const) }).optional(),
+        paternal_grandmother: z.object({ status: z.enum(['affected','carrier','unaffected','unknown'] as const) }).optional(),
+        paternal_grandfather: z.object({ status: z.enum(['affected','carrier','unaffected','unknown'] as const) }).optional(),
       }),
       responses: {
         // Python response shape

@@ -23,17 +23,42 @@ export function useCalculateRisk() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: InsertCalculation & { observed_child_outcome?: string }) => {
+    mutationFn: async (data: InsertCalculation & { 
+      observed_child_outcome?: string; 
+      generations?: number; 
+      maternalGrandmotherStatus?: string;
+      maternalGrandfatherStatus?: string;
+      paternalGrandmotherStatus?: string;
+      paternalGrandfatherStatus?: string;
+    }) => {
       try {
+        const generations = data.generations || 2;
+        
+        // For 3-gen: parent1 = maternal grandmother (primary grandparent for maternal line)
+        //            parent2 = mother
+        // For 2-gen: parent1 = father, parent2 = mother (unchanged)
+        const parent1Status = generations === 3 
+          ? (data.maternalGrandmotherStatus || "unknown")
+          : (data.fatherStatus);
+        const parent2Status = generations === 3
+          ? (data.motherStatus)
+          : (data.motherStatus);
+        
         const res = await fetch(api.calculations.calculate.path, {
           method: api.calculations.calculate.method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             inheritance_type: data.inheritancePattern,
-            parent1: { status: data.motherStatus },
-            parent2: { status: data.fatherStatus },
+            parent1: { status: parent1Status },
+            parent2: { status: parent2Status },
             child_sex: data.childSex === "unknown" ? "male" : data.childSex,
             observed_child_outcome: data.observed_child_outcome || undefined,
+            generations: generations,
+            // Include all grandparents for future use or extended calculations
+            maternal_grandmother: generations === 3 ? { status: data.maternalGrandmotherStatus || "unknown" } : undefined,
+            maternal_grandfather: generations === 3 ? { status: data.maternalGrandfatherStatus || "unknown" } : undefined,
+            paternal_grandmother: generations === 3 ? { status: data.paternalGrandmotherStatus || "unknown" } : undefined,
+            paternal_grandfather: generations === 3 ? { status: data.paternalGrandfatherStatus || "unknown" } : undefined,
           }),
         });
 

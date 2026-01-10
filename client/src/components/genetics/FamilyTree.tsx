@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 type Status = "affected" | "carrier" | "unaffected" | "unknown";
 
 interface FamilyMemberNodeProps {
-  role: "Mother" | "Father" | "Child";
+  role: "Mother" | "Father" | "Child" | "Maternal Grandparent" | "Paternal Grandparent" | "Grandparent" | "Maternal Grandmother" | "Maternal Grandfather" | "Paternal Grandmother" | "Paternal Grandfather";
   status: Status;
   sex?: "male" | "female";
   onChange?: (status: Status) => void;

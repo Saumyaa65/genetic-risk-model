@@ -27,6 +27,7 @@ export async function registerRoutes(
             parent2: input.parent2,
             child_sex: input.child_sex,
             observed_child_outcome: input.observed_child_outcome || null,
+            generations: input.generations || 2,
           }),
         }
       );
